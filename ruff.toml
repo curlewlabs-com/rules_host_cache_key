@@ -1,0 +1,8 @@
+# A project configuration keeps a contributor's own ruff settings out of the
+# checks, so they match CI.
+target-version = "py310"
+
+# The repository rule runs this with the host's python3, which is 3.9 where
+# Xcode or the Command Line Tools provide it.
+[per-file-target-version]
+"host_key.py" = "py39"
