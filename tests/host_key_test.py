@@ -100,6 +100,34 @@ class HomebrewTest(unittest.TestCase):
         link.symlink_to("../Cellar/tool/1.0")
         self.assertNotEqual(before, homebrew(prefix))
 
+    def test_malformed_sbom_keys_the_keg_by_content(self) -> None:
+        # An SBOM is Homebrew's record, not ours; a shape the reader does not
+        # expect must leave the keg keyed by its bytes, not fail the fetch.
+        for index, malformed in enumerate(
+            (
+                "[]",
+                "null",
+                '{"packages": {}}',
+                '{"packages": ["bash"]}',
+                '{"packages": [{"name": "bash", "downloadLocation": 1}]}',
+                (
+                    '{"packages": [{"name": "bash", "downloadLocation":'
+                    ' "https://ghcr.io/v2/homebrew/core/bash/blobs/sha256:aa",'
+                    ' "checksums": ["SHA256"]}]}'
+                ),
+            )
+        ):
+            with self.subTest(sbom=malformed):
+                prefix = self.scratch / f"prefix-{index}"
+                keg = pour(prefix, "bash", "5.3.20", None, installed_at=1)
+                (keg / "sbom.spdx.json").write_text(malformed)
+                identity = host_key.homebrew_identity(prefix, host_key.Watches())
+                assert isinstance(identity, dict)
+                kegs = identity["kegs"]
+                assert isinstance(kegs, list)
+                self.assertEqual(len(kegs), 1)
+                self.assertIn(" content:", kegs[0])
+
     def test_prefix_without_cellar_is_skipped_and_watched(self) -> None:
         # Installing Homebrew later must reach Bazel, so the absent Cellar is
         # watched for appearing.

@@ -249,12 +249,18 @@ def bottle_digest(keg: Path, formula: str) -> str | None:
         document = json.loads((keg / "sbom.spdx.json").read_text())
     except (OSError, ValueError):
         return None
-    for package in document.get("packages", []):
-        location = package.get("downloadLocation", "")
-        if package.get("name") != formula or "/blobs/sha256:" not in location:
+    # An SBOM of another shape names no bottle, so the keg is keyed by its
+    # content rather than failing the fetch.
+    packages = document.get("packages") if isinstance(document, dict) else None
+    for package in packages if isinstance(packages, list) else []:
+        if not isinstance(package, dict) or package.get("name") != formula:
             continue
-        for checksum in package.get("checksums", []):
-            if checksum.get("algorithm") == "SHA256":
+        location = package.get("downloadLocation")
+        if not isinstance(location, str) or "/blobs/sha256:" not in location:
+            continue
+        checksums = package.get("checksums")
+        for checksum in checksums if isinstance(checksums, list) else []:
+            if isinstance(checksum, dict) and checksum.get("algorithm") == "SHA256":
                 value = checksum.get("checksumValue")
                 return value if isinstance(value, str) else None
     return None
