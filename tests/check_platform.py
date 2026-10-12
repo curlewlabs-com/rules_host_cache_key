@@ -37,6 +37,7 @@ genrule(
 def consumer_module(
     module_root: Path, tools: Path, prefix: Path | None, developer_dir: str = ""
 ) -> str:
+    developer = f"developer_dir = {json.dumps(developer_dir)}," if developer_dir else ""
     homebrew = f'homebrew_prefixes = ["{prefix}"],' if prefix is not None else ""
     search_path = (
         f'search_path = ["/bin", "/usr/bin", "/usr/local/bin", "{tools}"],'
@@ -53,7 +54,7 @@ host_cache_key = use_repo_rule("@rules_host_cache_key//:defs.bzl", "host_cache_k
 
 host_cache_key(
     name = "host_cache_key",
-    developer_dir = {json.dumps(developer_dir)},
+    {developer}
     {homebrew}
     {search_path}
 )
