@@ -172,6 +172,18 @@ class SearchPathTest(unittest.TestCase):
         link.symlink_to("second")
         self.assertNotEqual(before, self.identity())
 
+    def test_linked_directory_is_watched_through_its_link(self) -> None:
+        # Bazel records a watched link to a directory only as a directory, so
+        # watches under the resolved path would never see the link moved.
+        (self.directory / "one").mkdir()
+        (self.directory / "one" / "tool").write_bytes(b"one")
+        linked = self.directory / "tools"
+        linked.symlink_to("one")
+        watches = host_key.Watches()
+        host_key.search_path_identity([linked], watches, SYSTEM_VOLUME)
+        self.assertIn(str(linked / "tool"), watches.files)
+        self.assertIn(str(linked), watches.directories)
+
     @unittest.skipIf(os.geteuid() == 0, "root reads every file")
     def test_unreadable_file_ignores_timestamps(self) -> None:
         # An inode or a timestamp would differ between hosts holding the same
@@ -233,6 +245,18 @@ class SystemVolumeTest(unittest.TestCase):
         covered = host_key.on_system_volume
         self.assertTrue(covered(Path("/bin/sh"), SYSTEM_VOLUME))
         self.assertFalse(covered(self.directory / "bin" / "sh", SYSTEM_VOLUME))
+
+
+@unittest.skipUnless(sys.platform == "darwin", "only macOS selects an Xcode")
+class XcodeSelectionTest(unittest.TestCase):
+    def test_selection_is_watched_through_its_link(self) -> None:
+        # xcode-select moves a link to a directory, which Bazel records only as
+        # a directory; without a file watched through it, a newly selected
+        # Xcode would keep the old one's key.
+        watches = host_key.Watches()
+        host_key.macos_fields(watches)
+        through = host_key.XCODE_SELECTION / "usr" / "bin" / "xcodebuild"
+        self.assertIn(str(through), watches.files)
 
 
 if __name__ == "__main__":

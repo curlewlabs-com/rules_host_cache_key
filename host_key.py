@@ -173,8 +173,12 @@ def search_path_identity(
         digest.update(f"{directory}={resolved}\n".encode())
         if directory != resolved:
             watches.file(directory)
-        if not on_system_volume(resolved, system_volume):
-            watches.listing(resolved)
+        # Watches go through the directory as named. Bazel records a watched
+        # link to a directory only as a directory, so a watch on the resolved
+        # path would never see the link moved; through the link, it reaches
+        # whatever the link points at now.
+        if not on_system_volume(directory, system_volume):
+            watches.listing(directory)
         if resolved in listed:
             continue
         listed.add(resolved)
@@ -182,7 +186,7 @@ def search_path_identity(
             digest.update(b"absent\n")
             continue
         # PATH search looks at direct entries only, never into subdirectories.
-        for entry in sorted(resolved.iterdir()):
+        for entry in sorted(directory.iterdir()):
             identity = entry_identity(entry, digests, watches, system_volume)
             digest.update(f"{identity}\n".encode())
     return digest.hexdigest()
@@ -212,6 +216,10 @@ def developer_tools_version(developer_dir: Path, watches: Watches) -> str:
 def macos_fields(watches: Watches) -> dict[str, object]:
     watches.file(MACOS_VERSION)
     watches.file(XCODE_SELECTION)
+    # The selection is a link to a directory, which Bazel records only as a
+    # directory. Moving it is seen through this file instead: its bytes differ
+    # from one Xcode build to the next, and the Command Line Tools have none.
+    watches.file(XCODE_SELECTION / "usr" / "bin" / "xcodebuild")
     try:
         developer_dir = command_output("/usr/bin/xcode-select", "--print-path")
     except subprocess.CalledProcessError:
