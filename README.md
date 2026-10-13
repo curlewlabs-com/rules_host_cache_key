@@ -23,7 +23,7 @@ key, so:
 Add to `MODULE.bazel`:
 
 ```starlark
-bazel_dep(name = "rules_host_cache_key", version = "0.0.1")
+bazel_dep(name = "rules_host_cache_key", version = "0.0.3")
 
 host_cache_key = use_repo_rule("@rules_host_cache_key//:defs.bzl", "host_cache_key")
 host_cache_key(name = "host_cache_key")
