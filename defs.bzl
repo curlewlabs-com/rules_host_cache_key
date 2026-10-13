@@ -18,7 +18,13 @@ def _host_cache_key_impl(rctx):
     interpreter = rctx.path(python) if python.startswith("/") else rctx.which(python)
     if interpreter == None or not interpreter.exists:
         fail("host_cache_key: no Python interpreter at %r; set the `python` attribute" % python)
-    command = [interpreter, rctx.path(Label("//:host_key.py"))]
+    script = Label("//:host_key.py")
+
+    # Bazel records nothing for a file reached through rctx.path. Unwatched, an
+    # upgrade that changes only host_key.py would leave an existing output base
+    # on the old script's key and watches until some other watched path changed.
+    rctx.watch(script)
+    command = [interpreter, rctx.path(script)]
     for directory in rctx.attr.search_path:
         command.extend(["--search-path", directory])
     for prefix in rctx.attr.homebrew_prefixes:

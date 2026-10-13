@@ -80,12 +80,13 @@ The selected directory remains in the key because host tools can record its path
 
 ## When the key changes
 
-The rule asks Bazel to watch everything it read, except search path entries
-and listings on the macOS system volume: those change only with the OS build,
-which Bazel watches instead. When any of it changes, Bazel recomputes the key at
-its next command, including in a server that is already running, and every
-action whose key changed runs again or comes from a cache entry made under the
-same key.
+The rule asks Bazel to watch everything it read, except search path entries and
+listings on the macOS system volume: those change only with the OS build, which
+Bazel watches instead. It also watches its own `host_key.py`, so upgrading this
+module brings an existing output base onto the new release's key and watches.
+When any of it changes, Bazel recomputes the key at its next command, including
+in a server that is already running, and every action whose key changed runs
+again or comes from a cache entry made under the same key.
 
 Bazel reads each watched file in full when a new server first uses the
 repository. Leaving the system volume out spares that check a read of every

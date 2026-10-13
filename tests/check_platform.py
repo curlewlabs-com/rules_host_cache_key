@@ -33,6 +33,14 @@ genrule(
 )
 """
 
+# Stands in for a release that changed only host_key.py: a report under the
+# rule's interface naming another key.
+UPGRADED_SCRIPT = """\
+import json
+
+print(json.dumps({"key": "upgraded", "fields": {}, "watch_files": [], "watch_directories": []}))
+"""
+
 
 def consumer_module(
     module_root: Path, tools: Path, prefix: Path | None, developer_dir: str = ""
@@ -154,6 +162,12 @@ def expect(step: str, stderr: str, wanted: str) -> None:
 
 
 def check_watched_changes(bazel: str, module_root: Path, scratch: Path) -> None:
+    # A copy, so a step can upgrade the module's own script. Convenience links
+    # into an output base would be followed and copied whole.
+    module = scratch / "module"
+    shutil.copytree(
+        module_root, module, ignore=shutil.ignore_patterns(".git", "bazel-*")
+    )
     # The search path names the tools through a link to their directory.
     tools = scratch / "tools"
     (scratch / "tools-one").mkdir()
@@ -166,9 +180,9 @@ def check_watched_changes(bazel: str, module_root: Path, scratch: Path) -> None:
     write_sbom(keg, BOTTLE)
     workspace = scratch / "consumer"
     workspace.mkdir()
-    shutil.copy(module_root / ".bazelversion", workspace / ".bazelversion")
+    shutil.copy(module / ".bazelversion", workspace / ".bazelversion")
     (workspace / "BUILD.bazel").write_text(CONSUMER_BUILD)
-    (workspace / "MODULE.bazel").write_text(consumer_module(module_root, tools, prefix))
+    (workspace / "MODULE.bazel").write_text(consumer_module(module, tools, prefix))
 
     consumer = Consumer(bazel, workspace, scratch / "disk-cache")
     first, second = scratch / "first-output-base", scratch / "second-output-base"
@@ -208,6 +222,13 @@ def check_watched_changes(bazel: str, module_root: Path, scratch: Path) -> None:
             "tool directory link moved, running server",
             consumer.build(second),
             "executed",
+        )
+
+        # Upgrading this module can change host_key.py and nothing else; the
+        # key follows only because the rule watches its own script.
+        (module / "host_key.py").write_text(UPGRADED_SCRIPT)
+        expect(
+            "host_key.py upgraded, running server", consumer.build(second), "executed"
         )
     finally:
         consumer.shutdown()
