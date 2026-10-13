@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import platform
 import re
 import shutil
@@ -33,7 +34,10 @@ genrule(
 """
 
 
-def consumer_module(module_root: Path, tools: Path, prefix: Path | None) -> str:
+def consumer_module(
+    module_root: Path, tools: Path, prefix: Path | None, developer_dir: str = ""
+) -> str:
+    developer = f"developer_dir = {json.dumps(developer_dir)}," if developer_dir else ""
     homebrew = f'homebrew_prefixes = ["{prefix}"],' if prefix is not None else ""
     search_path = (
         f'search_path = ["/bin", "/usr/bin", "/usr/local/bin", "{tools}"],'
@@ -50,6 +54,7 @@ host_cache_key = use_repo_rule("@rules_host_cache_key//:defs.bzl", "host_cache_k
 
 host_cache_key(
     name = "host_cache_key",
+    {developer}
     {homebrew}
     {search_path}
 )
@@ -79,7 +84,9 @@ class Consumer:
         self.disk_cache = disk_cache
         self.output_bases: list[Path] = []
 
-    def build(self, output_base: Path) -> str:
+    def build(
+        self, output_base: Path, environment: dict[str, str] | None = None
+    ) -> str:
         if output_base not in self.output_bases:
             self.output_bases.append(output_base)
         completed = subprocess.run(
@@ -93,6 +100,7 @@ class Consumer:
                 f"--disk_cache={self.disk_cache}",
             ],
             cwd=self.workspace,
+            env=environment,
             capture_output=True,
             text=True,
             check=False,
@@ -191,7 +199,9 @@ def check_watched_changes(bazel: str, module_root: Path, scratch: Path) -> None:
         consumer.shutdown()
 
 
-def check_this_host(bazel: str, module_root: Path, scratch: Path) -> None:
+def check_this_host(
+    bazel: str, module_root: Path, scratch: Path, alternate_developer_dir: str
+) -> None:
     workspace = scratch / "defaults"
     workspace.mkdir()
     shutil.copy(module_root / ".bazelversion", workspace / ".bazelversion")
@@ -202,6 +212,56 @@ def check_this_host(bazel: str, module_root: Path, scratch: Path) -> None:
     try:
         expect("default attributes", consumer.build(output_base), "executed")
         report = consumer.key_report(output_base)
+        if platform.system() == "Darwin":
+            # A workflow may export an acquired Xcode's job-local path; the
+            # default platform still describes the globally selected host tools.
+            overridden = {**os.environ, "DEVELOPER_DIR": str(scratch / "unselected")}
+            expect(
+                "inherited developer override, running server",
+                consumer.build(output_base, overridden),
+                "reused",
+            )
+            fresh = scratch / "override-output-base"
+            expect(
+                "inherited developer override, fresh base",
+                consumer.build(fresh, overridden),
+                "disk cache hit",
+            )
+            if consumer.key_report(fresh) != report:
+                raise SystemExit(
+                    "check_platform: inherited Xcode selection changed the host key"
+                )
+            if alternate_developer_dir:
+                (workspace / "MODULE.bazel").write_text(
+                    consumer_module(module_root, Path(), None, alternate_developer_dir)
+                )
+                expect(
+                    "explicit developer selection, running server",
+                    consumer.build(output_base),
+                    "executed",
+                )
+                changed = consumer.key_report(output_base)
+                changed_fields = changed["fields"]
+                assert isinstance(changed_fields, dict)
+                fields = report["fields"]
+                assert isinstance(fields, dict)
+                if changed_fields["developer_tools"] == fields["developer_tools"]:
+                    raise SystemExit(
+                        "check_platform: alternate Xcode must have different tool identity"
+                    )
+                expect(
+                    "explicit developer selection, fresh base",
+                    consumer.build(fresh),
+                    "disk cache hit",
+                )
+                (workspace / "MODULE.bazel").write_text(
+                    consumer_module(module_root, Path(), None)
+                )
+                expect(
+                    "global developer selection restored",
+                    consumer.build(output_base),
+                    "disk cache hit",
+                )
     finally:
         consumer.shutdown()
     fields = report["fields"]
@@ -220,12 +280,13 @@ def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--bazel", default="bazel")
     parser.add_argument("--module-root", type=Path, default=ROOT)
+    parser.add_argument("--alternate-developer-dir", default="")
     args = parser.parse_args()
     module_root = args.module_root.resolve()
     with tempfile.TemporaryDirectory() as directory:
         scratch = Path(directory).resolve()
         check_watched_changes(args.bazel, module_root, scratch)
-        check_this_host(args.bazel, module_root, scratch)
+        check_this_host(args.bazel, module_root, scratch, args.alternate_developer_dir)
     print("check_platform: host changes reach action keys", flush=True)
 
 

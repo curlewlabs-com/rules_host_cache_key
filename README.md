@@ -67,6 +67,13 @@ Not covered:
 - Linux distributions without dpkg, and Windows. Both fail with an error
   instead of producing a key that covers less than it claims.
 
+On macOS the default key follows the global `xcode-select` selection, even when
+the process starting Bazel exports `DEVELOPER_DIR`. Strict action environments
+do not inherit that job-local override. If host-dependent actions explicitly
+select a different developer directory, set the rule's `developer_dir` to match.
+Actions that acquire Xcode declare that bundle as their own inputs instead.
+The selected directory remains in the key because host tools can record its path.
+
 ## When the key changes
 
 The rule asks Bazel to watch everything it read. When any of it changes, Bazel
@@ -93,6 +100,7 @@ All attributes of `host_cache_key` are optional:
 
 | Attribute | Default | Use |
 | --- | --- | --- |
+| `developer_dir` | empty | Global Xcode selection, or the directory explicitly selected by host-dependent actions. |
 | `parent` | `@platforms//host` | Your own host platform, when your build defines one. |
 | `search_path` | `/bin`, `/usr/bin`, `/usr/local/bin` | Add directories your actions find tools in. |
 | `homebrew_prefixes` | the three standard prefixes | Other Homebrew installations. |

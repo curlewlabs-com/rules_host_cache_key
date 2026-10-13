@@ -23,7 +23,7 @@ def _host_cache_key_impl(rctx):
         command.extend(["--search-path", directory])
     for prefix in rctx.attr.homebrew_prefixes:
         command.extend(["--homebrew-prefix", prefix])
-    result = rctx.execute(command, environment = {"LC_ALL": "C"}, quiet = True)
+    result = rctx.execute(command, environment = {"DEVELOPER_DIR": rctx.attr.developer_dir, "LC_ALL": "C"}, quiet = True)
     if result.return_code != 0:
         fail("host_cache_key: computing the host key failed:\n" + result.stderr)
     report = json.decode(result.stdout)
@@ -62,6 +62,12 @@ Hosts with identical tools share results.
 `:key.json` records the fields the key digests, for comparing two hosts.
 """,
     attrs = {
+        "developer_dir": attr.string(
+            default = "",
+            doc = "Developer directory used by macOS actions, or empty for the " +
+                  "global xcode-select selection. Match an explicit action " +
+                  "DEVELOPER_DIR here; job-local acquisition paths are not host tools.",
+        ),
         "exec_property": attr.string(
             default = "host-cache-key",
             doc = "Name of the execution property that carries the key.",
