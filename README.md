@@ -91,6 +91,13 @@ Bazel reads each watched file in full when a new server first uses the
 repository. Leaving the system volume out spares that check a read of every
 system tool, which on a freshly booted host can take tens of seconds.
 
+Bazel records a watched link to a directory only as a directory, not where it
+points, so the rule watches through such links instead: a search path directory
+named by a link, and the `xcode-select` selection, through its `xcodebuild`.
+Pointing one at different tools recomputes the key. Pointing one at a copy with
+the same names and bytes does not, and the key keeps naming the old path until
+something else recomputes it; the tools that run are the same.
+
 ## Comparing two machines
 
 The key and every field it digests are in `key.json`:

@@ -154,8 +154,10 @@ def expect(step: str, stderr: str, wanted: str) -> None:
 
 
 def check_watched_changes(bazel: str, module_root: Path, scratch: Path) -> None:
+    # The search path names the tools through a link to their directory.
     tools = scratch / "tools"
-    tools.mkdir()
+    (scratch / "tools-one").mkdir()
+    tools.symlink_to("tools-one")
     tool = tools / "tool"
     tool.write_bytes(b"one")
     prefix = scratch / "brew"
@@ -195,6 +197,18 @@ def check_watched_changes(bazel: str, module_root: Path, scratch: Path) -> None:
         tool.write_bytes(b"one")
         write_sbom(keg, BOTTLE)
         expect("original tools restored", consumer.build(second), "disk cache hit")
+
+        # Bazel records a watched link to a directory only as a directory, so
+        # only a watch through the link sees it pointed at other tools.
+        (scratch / "tools-two").mkdir()
+        (scratch / "tools-two" / "tool").write_bytes(b"other")
+        tools.unlink()
+        tools.symlink_to("tools-two")
+        expect(
+            "tool directory link moved, running server",
+            consumer.build(second),
+            "executed",
+        )
     finally:
         consumer.shutdown()
 
