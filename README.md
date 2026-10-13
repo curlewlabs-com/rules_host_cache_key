@@ -42,7 +42,9 @@ build after setup runs every action once under the new key.
 - **The action search path.** Every entry in `/bin`, `/usr/bin` and
   `/usr/local/bin`: its name, mode, link target, and the content of the file it
   resolves to. An unreadable file, such as a setuid `sudo`, contributes its size;
-  its bytes belong to the OS or a package, which the next items cover.
+  its bytes belong to the OS or a package, which the next items cover. On macOS,
+  an entry that resolves entirely within the sealed system volume contributes
+  no content either: the OS build covers it.
 - **macOS.** The OS build (`sw_vers`), which stands in for the sealed system
   volume and its libraries; the selected developer directory and its Xcode or
   Command Line Tools version; the shell `/bin/sh` runs.
@@ -60,6 +62,8 @@ with the same tools get the same key.
 Not covered:
 
 - Files edited in place without going through dpkg or Homebrew.
+- A macOS system volume that is not sealed. The OS build stands in for the
+  volume's contents, and the key does not check the seal.
 - Tools outside the search path, unless you add their directory to
   `search_path`.
 - Environment variables. Use `--incompatible_strict_action_env`, or declare
@@ -76,10 +80,16 @@ The selected directory remains in the key because host tools can record its path
 
 ## When the key changes
 
-The rule asks Bazel to watch everything it read. When any of it changes, Bazel
-recomputes the key at its next command, including in a server that is already
-running, and every action whose key changed runs again or comes from a cache
-entry made under the same key.
+The rule asks Bazel to watch everything it read, except search path entries
+and listings on the macOS system volume: those change only with the OS build,
+which Bazel watches instead. When any of it changes, Bazel recomputes the key at
+its next command, including in a server that is already running, and every
+action whose key changed runs again or comes from a cache entry made under the
+same key.
+
+Bazel reads each watched file in full when a new server first uses the
+repository. Leaving the system volume out spares that check a read of every
+system tool, which on a freshly booted host can take tens of seconds.
 
 ## Comparing two machines
 

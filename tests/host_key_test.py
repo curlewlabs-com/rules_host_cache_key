@@ -13,6 +13,12 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 import host_key
 
+# The host's real system volume where it has one, so the scratch tools below sit
+# off it, as a host's own installs do.
+SYSTEM_VOLUME = (
+    os.statvfs(host_key.MACOS_VERSION).f_fsid if sys.platform == "darwin" else None
+)
+
 
 def pour(
     prefix: Path,
@@ -144,7 +150,9 @@ class SearchPathTest(unittest.TestCase):
         self.directory = Path(scratch.name)
 
     def identity(self) -> str:
-        return host_key.search_path_identity([self.directory], host_key.Watches())
+        return host_key.search_path_identity(
+            [self.directory], host_key.Watches(), SYSTEM_VOLUME
+        )
 
     def test_changed_tool_bytes_rekey(self) -> None:
         tool = self.directory / "tool"
@@ -175,6 +183,56 @@ class SearchPathTest(unittest.TestCase):
         before = self.identity()
         os.utime(tool, (1, 1))
         self.assertEqual(before, self.identity())
+
+
+@unittest.skipUnless(sys.platform == "darwin", "only macOS has a sealed system volume")
+class SystemVolumeTest(unittest.TestCase):
+    def setUp(self) -> None:
+        scratch = tempfile.TemporaryDirectory()
+        self.addCleanup(scratch.cleanup)
+        # Watches name resolved paths, and macOS reaches the temporary
+        # directory through a link.
+        self.directory = Path(scratch.name).resolve()
+
+    def test_system_tools_are_not_watched_or_digested(self) -> None:
+        # Watching them makes every new Bazel server read each system tool
+        # whole, which takes tens of seconds on a freshly booted host; the OS
+        # build already keys them.
+        watches = host_key.Watches()
+        host_key.search_path_identity([Path("/bin")], watches, SYSTEM_VOLUME)
+        self.assertEqual((watches.files, watches.directories), (set(), set()))
+        identity = host_key.entry_identity(Path("/bin/sh"), {}, watches, SYSTEM_VOLUME)
+        self.assertNotIn(host_key.content_digest(Path("/bin/sh")), identity)
+
+    def test_link_within_the_system_volume_is_not_watched(self) -> None:
+        # A link that resolves in its own directory never leaves the volume, so
+        # the OS build keys the link as well as the file it reaches.
+        link = next(
+            entry
+            for entry in sorted(Path("/usr/bin").iterdir())
+            if entry.is_symlink() and "/" not in os.readlink(entry)
+        )
+        watches = host_key.Watches()
+        identity = host_key.entry_identity(link, {}, watches, SYSTEM_VOLUME)
+        self.assertTrue(identity.endswith("\0system-volume"), identity)
+        self.assertEqual(watches.files, set())
+
+    def test_link_from_elsewhere_into_the_system_volume_stays_watched(self) -> None:
+        # Moving a link outside the volume changes which tool runs without an
+        # OS update, so the build cannot stand in for it.
+        (self.directory / "sh").symlink_to("/bin/sh")
+        watches = host_key.Watches()
+        host_key.search_path_identity([self.directory], watches, SYSTEM_VOLUME)
+        self.assertIn(str(self.directory / "sh"), watches.files)
+        self.assertIn(str(self.directory), watches.directories)
+
+    def test_path_through_a_movable_directory_link_is_not_covered(self) -> None:
+        # A directory link off the volume can be pointed at other tools without
+        # an OS update, even while it leads onto the volume.
+        (self.directory / "bin").symlink_to("/bin")
+        covered = host_key.on_system_volume
+        self.assertTrue(covered(Path("/bin/sh"), SYSTEM_VOLUME))
+        self.assertFalse(covered(self.directory / "bin" / "sh", SYSTEM_VOLUME))
 
 
 if __name__ == "__main__":

@@ -84,7 +84,48 @@ def command_output(*command: str) -> str:
     ).stdout.strip()
 
 
-def entry_identity(entry: Path, digests: dict[Path, str], watches: Watches) -> str:
+def on_system_volume(path: Path, system_volume: int | None) -> bool:
+    """Whether resolving the absolute `path` stays on the system volume, which
+    changes only with the OS build: every directory it passes through, every
+    link it follows, and what it reaches.
+
+    A link or directory elsewhere can change without an OS update, so a path
+    that passes through one is not covered by the build even when it ends on
+    the volume.
+    """
+    if system_volume is None or not path.exists():
+        return False
+    current = Path(path.anchor)
+    pending = list(path.parts[1:])
+    links = 0
+    while pending:
+        # A link sits in the directory that holds it, so checking each
+        # directory before looking in it covers the links as well.
+        if os.statvfs(current).f_fsid != system_volume:
+            return False
+        part = pending.pop(0)
+        if part == "..":
+            current = current.parent
+            continue
+        candidate = current / part
+        if not candidate.is_symlink():
+            current = candidate
+            continue
+        # The path exists, so this bounds only a chain changed underneath the
+        # walk; it is macOS's own MAXSYMLINKS.
+        links += 1
+        if links > 32:
+            return False
+        text = Path(os.readlink(candidate))
+        if text.is_absolute():
+            current = Path(text.anchor)
+        pending[:0] = text.parts[1:] if text.is_absolute() else text.parts
+    return os.statvfs(current).f_fsid == system_volume
+
+
+def entry_identity(
+    entry: Path, digests: dict[Path, str], watches: Watches, system_volume: int | None
+) -> str:
     # Type and mode decide whether a PATH search runs the entry at all.
     parts = [entry.name, oct(entry.lstat().st_mode)]
     if entry.is_symlink():
@@ -97,7 +138,12 @@ def entry_identity(entry: Path, digests: dict[Path, str], watches: Watches) -> s
         return "\0".join(parts)
     status = target.stat()
     parts += [str(target), oct(status.st_mode)]
-    if stat.S_ISREG(status.st_mode):
+    if on_system_volume(entry, system_volume):
+        # The OS build keys these bytes. Bazel reads every watched file whole
+        # when a new server first checks the repository, so watching the
+        # system's tools would read all of them again at each server start.
+        parts.append("system-volume")
+    elif stat.S_ISREG(status.st_mode):
         if os.access(target, os.R_OK):
             if target not in digests:
                 digests[target] = content_digest(target)
@@ -112,8 +158,13 @@ def entry_identity(entry: Path, digests: dict[Path, str], watches: Watches) -> s
     return "\0".join(parts)
 
 
-def search_path_identity(directories: list[Path], watches: Watches) -> str:
-    """Digest every entry a PATH search or an absolute tool path can reach."""
+def search_path_identity(
+    directories: list[Path], watches: Watches, system_volume: int | None
+) -> str:
+    """Digest every entry a PATH search or an absolute tool path can reach.
+
+    `system_volume` is the filesystem the OS build keys as a whole, if any.
+    """
     digest = hashlib.sha256()
     digests: dict[Path, str] = {}
     listed: set[Path] = set()
@@ -122,7 +173,8 @@ def search_path_identity(directories: list[Path], watches: Watches) -> str:
         digest.update(f"{directory}={resolved}\n".encode())
         if directory != resolved:
             watches.file(directory)
-        watches.listing(resolved)
+        if not on_system_volume(resolved, system_volume):
+            watches.listing(resolved)
         if resolved in listed:
             continue
         listed.add(resolved)
@@ -131,7 +183,8 @@ def search_path_identity(directories: list[Path], watches: Watches) -> str:
             continue
         # PATH search looks at direct entries only, never into subdirectories.
         for entry in sorted(resolved.iterdir()):
-            digest.update(f"{entry_identity(entry, digests, watches)}\n".encode())
+            identity = entry_identity(entry, digests, watches, system_volume)
+            digest.update(f"{identity}\n".encode())
     return digest.hexdigest()
 
 
@@ -331,13 +384,15 @@ def host_fields(
         "system": system,
         "machine": platform.machine(),
     }
+    system_volume: int | None = None
     if system == "Darwin":
         fields.update(macos_fields(watches))
+        system_volume = os.statvfs(MACOS_VERSION).f_fsid
     elif system == "Linux":
         fields.update(linux_fields(watches))
     else:
         raise UnsupportedHost(f"no host key for {system}")
-    fields["search_path"] = search_path_identity(search_path, watches)
+    fields["search_path"] = search_path_identity(search_path, watches, system_volume)
     homebrew: dict[str, object] = {}
     for prefix in homebrew_prefixes:
         identity = homebrew_identity(prefix, watches)
