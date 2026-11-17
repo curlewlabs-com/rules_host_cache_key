@@ -1,8 +1,23 @@
 # Contributing
 
+Thanks for your interest in improving `rules_host_cache_key`. The bar for a
+change is whether the key still changes when the host tools it covers change,
+and stays the same on machines whose tools are the same. Bug fixes, coverage of
+a host the key now refuses, sharper refusals of hosts it cannot cover, and
+clearer docs are all welcome.
+
 Use the Bazel release in `.bazelversion`, Python 3.10 or later for the checks
 (the key itself needs only 3.9), and Git. Keep changes on a branch and open a
 pull request with the behavior change and its verification.
+
+## Before a large change
+
+Propose it in an issue before writing it. What the key reads, what it leaves
+out on purpose, and what the rule asks Bazel to watch are set out in the
+README's [What the key covers](README.md#what-the-key-covers) and
+[When the key changes](README.md#when-the-key-changes), and `host_key.py`
+computes them. A change to what the key covers changes every host's key once,
+so a short discussion up front saves rework.
 
 ## Maintainership and review
 
