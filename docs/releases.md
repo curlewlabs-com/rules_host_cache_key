@@ -2,6 +2,13 @@
 
 A release is a source-only archive of a commit on `main`.
 
+## Which releases need approval
+
+A patch or minor release needs no approval beyond the checks in the steps below:
+whoever cuts it follows them in order, and each step's check is the gate. A
+major version, a 1.0, or a minor before 1.0 that changes an interface consumers
+use needs the maintainer's explicit approval before its tag is pushed.
+
 ## Prepare a candidate
 
 From a clean checkout of the candidate commit:
