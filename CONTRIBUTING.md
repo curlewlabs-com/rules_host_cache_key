@@ -46,3 +46,10 @@ build's process summary. It needs network access for Bazel's own downloads.
 ## Releases
 
 See [release preparation](docs/releases.md).
+
+## License
+
+Unless you explicitly state otherwise, any contribution intentionally submitted
+for inclusion in this project by you, as defined in the Apache-2.0 license,
+shall be dual licensed under the MIT and Apache-2.0 licenses, as the README's
+License section describes, without any additional terms or conditions.
