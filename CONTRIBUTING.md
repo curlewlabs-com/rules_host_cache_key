@@ -6,9 +6,10 @@ and stays the same on machines whose tools are the same. Bug fixes, coverage of
 a host the key now refuses, sharper refusals of hosts it cannot cover, and
 clearer docs are all welcome.
 
-Use the Bazel release in `.bazelversion`, Python 3.10 or later for the checks
-(the key itself needs only 3.9), and Git. Keep changes on a branch and open a
-pull request with the behavior change and its verification.
+Use the Bazel release in `.bazelversion`, Python 3.11 or later for the checks
+(the key itself needs only 3.9; on 3.10 mypy needs a package
+`requirements-dev.txt` does not pin), and Git. Keep changes on a branch and
+open a pull request with the behavior change and its verification.
 
 ## Before a large change
 
