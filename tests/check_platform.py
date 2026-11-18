@@ -20,6 +20,11 @@ import subprocess
 import sys
 import tempfile
 from pathlib import Path
+from typing import TYPE_CHECKING
+
+# typing.TypeGuard is absent on Python 3.9, which the key supports.
+if TYPE_CHECKING:
+    from typing import TypeGuard
 
 ROOT = Path(__file__).resolve().parents[1]
 SUMMARY = re.compile(r"INFO: \d+ process(?:es)?: (.*)\.$", re.MULTILINE)
@@ -40,6 +45,24 @@ import json
 
 print(json.dumps({"key": "upgraded", "fields": {}, "watch_files": [], "watch_directories": []}))
 """
+
+
+def is_object(value: object) -> TypeGuard[dict[str, object]]:
+    return isinstance(value, dict)
+
+
+def is_array(value: object) -> TypeGuard[list[object]]:
+    return isinstance(value, list)
+
+
+def as_dict(value: object) -> dict[str, object]:
+    assert is_object(value)
+    return value
+
+
+def as_list(value: object) -> list[object]:
+    assert is_array(value)
+    return value
 
 
 def consumer_module(
@@ -190,9 +213,8 @@ def check_watched_changes(bazel: str, module_root: Path, scratch: Path) -> None:
         expect("first build", consumer.build(first), "executed")
         expect("unchanged host", consumer.build(first), "reused")
         report = consumer.key_report(first)
-        fields = report["fields"]
-        assert isinstance(fields, dict)
-        kegs = fields["homebrew"][str(prefix)]["kegs"]
+        fields = as_dict(report["fields"])
+        kegs = as_dict(as_dict(fields["homebrew"])[str(prefix)])["kegs"]
         if kegs != [f"tool 1.0 bottle:{BOTTLE}"]:
             raise SystemExit(f"check_platform: scratch keg keyed as {kegs}")
 
@@ -299,11 +321,9 @@ def check_this_host(
                 )
     finally:
         consumer.shutdown()
-    fields = report["fields"]
-    assert isinstance(fields, dict)
-    homebrew = fields["homebrew"]
-    assert isinstance(homebrew, dict)
-    kegs = sum(len(prefix["kegs"]) for prefix in homebrew.values())
+    fields = as_dict(report["fields"])
+    homebrew = as_dict(fields["homebrew"])
+    kegs = sum(len(as_list(as_dict(prefix)["kegs"])) for prefix in homebrew.values())
     print(
         f"check_platform: {platform.system()} host key {report['key']}, "
         f"covering {kegs} Homebrew kegs",

@@ -22,6 +22,12 @@ import subprocess
 import sys
 from dataclasses import dataclass, field
 from pathlib import Path
+from typing import TYPE_CHECKING
+
+# The key runs on Python 3.9, which has no typing.TypeGuard; annotations are not
+# evaluated, so only the type checker needs it.
+if TYPE_CHECKING:
+    from typing import TypeGuard
 
 # Bump when what a field means changes, so every host gets a new key.
 SCHEMA = 1
@@ -55,8 +61,8 @@ class UnsupportedHost(Exception):
 class Watches:
     """Paths whose change must make Bazel compute the key again."""
 
-    files: set[str] = field(default_factory=set)
-    directories: set[str] = field(default_factory=set)
+    files: set[str] = field(default_factory=set[str])
+    directories: set[str] = field(default_factory=set[str])
 
     def file(self, path: Path) -> None:
         self.files.add(str(path))
@@ -300,6 +306,16 @@ def linux_fields(watches: Watches) -> dict[str, object]:
     }
 
 
+# isinstance alone narrows decoded JSON to `dict[Unknown, Unknown]`, which strict
+# type checking rejects; these name the element types instead.
+def _is_object(value: object) -> TypeGuard[dict[str, object]]:
+    return isinstance(value, dict)
+
+
+def _is_array(value: object) -> TypeGuard[list[object]]:
+    return isinstance(value, list)
+
+
 def bottle_digest(keg: Path, formula: str) -> str | None:
     """Return the sha256 of the bottle Homebrew poured into `keg`, if recorded.
 
@@ -312,16 +328,16 @@ def bottle_digest(keg: Path, formula: str) -> str | None:
         return None
     # An SBOM of another shape names no bottle, so the keg is keyed by its
     # content rather than failing the fetch.
-    packages = document.get("packages") if isinstance(document, dict) else None
-    for package in packages if isinstance(packages, list) else []:
-        if not isinstance(package, dict) or package.get("name") != formula:
+    packages = document.get("packages") if _is_object(document) else None
+    for package in packages if _is_array(packages) else []:
+        if not _is_object(package) or package.get("name") != formula:
             continue
         location = package.get("downloadLocation")
         if not isinstance(location, str) or "/blobs/sha256:" not in location:
             continue
         checksums = package.get("checksums")
-        for checksum in checksums if isinstance(checksums, list) else []:
-            if isinstance(checksum, dict) and checksum.get("algorithm") == "SHA256":
+        for checksum in checksums if _is_array(checksums) else []:
+            if _is_object(checksum) and checksum.get("algorithm") == "SHA256":
                 value = checksum.get("checksumValue")
                 return value if isinstance(value, str) else None
     return None
