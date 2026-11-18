@@ -6,9 +6,10 @@ and stays the same on machines whose tools are the same. Bug fixes, coverage of
 a host the key now refuses, sharper refusals of hosts it cannot cover, and
 clearer docs are all welcome.
 
-Use the Bazel release in `.bazelversion`, Python 3.10 or later for the checks
-(the key itself needs only 3.9), and Git. Keep changes on a branch and open a
-pull request with the behavior change and its verification.
+Use the Bazel release in `.bazelversion`, Python 3.11 or later for the checks
+(the key itself needs only 3.9; on 3.10 mypy needs a package
+`requirements-dev.txt` does not pin), and Git. Keep changes on a branch and
+open a pull request with the behavior change and its verification.
 
 ## Before a large change
 
@@ -34,7 +35,8 @@ Fixed version tags and published release artifacts are never replaced.
 ## Local checks
 
 ```sh
-pre-commit run --all-files
+python3 -m pip install -r requirements-dev.txt
+mypy
 python3 -m unittest discover -s tests -p '*_test.py'
 python3 tests/check_platform.py
 ```
