@@ -8,6 +8,11 @@ import sys
 import tempfile
 import unittest
 from pathlib import Path
+from typing import TYPE_CHECKING
+
+# typing.TypeGuard is absent on Python 3.9, which the key supports.
+if TYPE_CHECKING:
+    from typing import TypeGuard
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
@@ -18,6 +23,15 @@ import host_key
 SYSTEM_VOLUME = (
     os.statvfs(host_key.MACOS_VERSION).f_fsid if sys.platform == "darwin" else None
 )
+
+
+def is_string_list(value: object) -> TypeGuard[list[str]]:
+    return isinstance(value, list)
+
+
+def string_list(value: object) -> list[str]:
+    assert is_string_list(value)
+    return value
 
 
 def pour(
@@ -130,9 +144,9 @@ class HomebrewTest(unittest.TestCase):
                 identity = host_key.homebrew_identity(prefix, host_key.Watches())
                 assert isinstance(identity, dict)
                 kegs = identity["kegs"]
-                assert isinstance(kegs, list)
-                self.assertEqual(len(kegs), 1)
-                self.assertIn(" content:", kegs[0])
+                names = string_list(kegs)
+                self.assertEqual(len(names), 1)
+                self.assertIn(" content:", names[0])
 
     def test_prefix_without_cellar_is_skipped_and_watched(self) -> None:
         # Installing Homebrew later must reach Bazel, so the absent Cellar is
