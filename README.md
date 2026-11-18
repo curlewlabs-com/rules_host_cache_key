@@ -116,14 +116,14 @@ different days usually do not, because they poured different bottles.
 
 All attributes of `host_cache_key` are optional:
 
-| Attribute | Default | Use |
-| --- | --- | --- |
-| `developer_dir` | empty | Global Xcode selection, or the directory explicitly selected by host-dependent actions. |
-| `parent` | `@platforms//host` | Your own host platform, when your build defines one. |
-| `search_path` | `/bin`, `/usr/bin`, `/usr/local/bin` | Add directories your actions find tools in. |
-| `homebrew_prefixes` | the three standard prefixes | Other Homebrew installations. |
-| `exec_property` | `host-cache-key` | The execution property's name. |
-| `python` | `python3` | Python 3.9 or later that computes the key. |
+| Attribute           | Default                              | Use                                                                                     |
+| ------------------- | ------------------------------------ | --------------------------------------------------------------------------------------- |
+| `developer_dir`     | empty                                | Global Xcode selection, or the directory explicitly selected by host-dependent actions. |
+| `parent`            | `@platforms//host`                   | Your own host platform, when your build defines one.                                    |
+| `search_path`       | `/bin`, `/usr/bin`, `/usr/local/bin` | Add directories your actions find tools in.                                             |
+| `homebrew_prefixes` | the three standard prefixes          | Other Homebrew installations.                                                           |
+| `exec_property`     | `host-cache-key`                     | The execution property's name.                                                          |
+| `python`            | `python3`                            | Python 3.9 or later that computes the key.                                              |
 
 Two things to know when your build already uses execution platforms or
 properties:
@@ -140,8 +140,8 @@ runs elsewhere, so use this for local execution with a disk or remote cache.
 
 ## Requirements
 
-- Bazel 9.2.0 is what CI tests on Linux (x86_64, arm64) and macOS (arm64,
-  x86_64). The rule needs `repository_ctx.watch`, which Bazel 7.1 introduced.
+- Bazel 9.2.0 is what CI tests on Linux (x86_64, arm64) and macOS (arm64). The
+  rule needs `repository_ctx.watch`, which Bazel 7.1 introduced.
 - Python 3.9 or later on `PATH` when Bazel fetches the repository. On macOS,
   Xcode or the Command Line Tools provide `/usr/bin/python3`.
 

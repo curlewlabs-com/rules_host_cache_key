@@ -1,0 +1,7 @@
+# Type-check settings only; ruff reads ruff.toml.
+[tool.mypy]
+# The oldest Python mypy accepts. host_key.py runs on 3.9, which ruff.toml's
+# per-file target and the CI run on Xcode's python3 hold.
+python_version = "3.10"
+strict = true
+files = ["host_key.py", "tests", "tools"]

@@ -34,7 +34,8 @@ Fixed version tags and published release artifacts are never replaced.
 ## Local checks
 
 ```sh
-pre-commit run --all-files
+python3 -m pip install -r requirements-dev.txt
+mypy
 python3 -m unittest discover -s tests -p '*_test.py'
 python3 tests/check_platform.py
 ```
