@@ -1,5 +1,8 @@
 # Release preparation
 
+This page records how the published releases were prepared. The repository is
+[no longer maintained](../README.md#no-longer-maintained).
+
 A release is a source-only archive of a commit on `main`.
 
 ## Which releases need approval

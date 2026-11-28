@@ -1,14 +1,7 @@
 # Security policy
 
-Report suspected vulnerabilities privately using
-[GitHub private vulnerability reporting](https://github.com/curlewlabs-com/rules_host_cache_key/security/advisories/new).
-Include the affected release or revision, the host OS and Bazel version,
-reproduction steps, and the observed impact.
-
-Curlew Labs maintains this repository; Jeffrey Wall
-([jeffwall-curlewlabs](https://github.com/jeffwall-curlewlabs)) is the release
-and security contact through GitHub. Reports are reviewed on a best-effort
-basis without a guaranteed response time. Fixes target the latest release.
+This repository is [no longer maintained](README.md#no-longer-maintained).
+Reports are no longer acted on, and no further releases or fixes are planned.
 
 ## Trust boundary
 
