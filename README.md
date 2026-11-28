@@ -18,6 +18,16 @@ key, so:
 - machines with the same tools share results through a disk cache or a remote
   cache, and machines with different tools never exchange them.
 
+## No longer maintained
+
+This repository is no longer maintained. Its releases stay available and
+unchanged, and no further releases or fixes are planned.
+
+The approach works. Fingerprinting the host tool inventory on every machine
+caused keys to drift as unrelated tools changed, so machines that could have
+shared cached results stopped sharing them. That was more fingerprinting than
+the problem needed.
+
 ## Setup
 
 Add to `MODULE.bazel`:
@@ -68,6 +78,9 @@ Not covered:
   `search_path`.
 - Environment variables. Use `--incompatible_strict_action_env`, or declare
   what an action reads with `--action_env`.
+- A target's own [`exec_properties`](https://bazel.build/versions/9.0.0/extending/exec-groups#execution-groups-and-platform-execution-properties)
+  can override the platform's fingerprint property. Actions that override that
+  property lose the cache isolation provided by the generated fingerprint.
 - Linux distributions without dpkg, and Windows. Both fail with an error
   instead of producing a key that covers less than it claims.
 
